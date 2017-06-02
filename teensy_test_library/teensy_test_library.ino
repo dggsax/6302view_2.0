@@ -5,8 +5,8 @@ unsigned int deltaT = 1000;         // Sample period in microseconds.
 int angleAverages = 5;
 int past_size = 3;                 // interval for delta, larger=less noise, more delay.
 unsigned long transferDt = 20000; // usecs between host updates  
-float Kp, Kd, Kbemf, Ku, Ki, directV, desiredV;
-                                 
+//float Kp, Kd, Kbemf, Ku, Ki, directV, desiredV;
+
 // ***************************************************************
 
 // Teensy definitions
@@ -36,34 +36,31 @@ float Kp, Kd, Kbemf, Ku, Ki, directV, desiredV;
 MEDIATOR test = MEDIATOR();
 
 //Rest of Setup:
-bool first_time;
 String config_message_30_bytes = "&A~DesiredAngV~5&C&S~Direct~O~0~5.0~0.1&S~DesiredAngV~A~-1~1~0.1&T~AngleV~F4~0~2.5&T~BackEMF~F4~0~5&T~MCmd~F4~0~5&H~4&";
 String config_message = config_message_30_bytes;
 
 float rad2deg = 1.0/deg2rad;        // 180/pi
- 
+
 float dTsec = 1.0e-6*deltaT;       // The period in seconds. 
 float scaleD = 1.0/(dTsec*past_size); // Divide deltas by interval.    
-                             
+
 float errorVintegral;                // Variable for integrating angle errors.
 float integralMax = 200;            // Maximum value of the integral
 
-int loopCounter;
-
 // Storage for past values.
 float pastErrorV[20];  // Should be larger array than past_size.
-//IN HEADER
-char buf[60];  // 
 
 // Variables for loop control
-uint32_t loop_counter;
-int numSkip;  // Number of loops to skip between host updates.
+//
 elapsedMicros loopTime; // Create elapsed time variable to ensure regular loops.
 unsigned int headroom;  // Headroom is time left before loop takes too long.
 boolean switchFlag;
 
 // Initializes past values.
 void setup() {
+  // Set up for the mediator
+  test.setup(deltaT,transferDt);
+  
   // Set up inputs
   analogReadResolution(adcRes);
   pinMode(motorVoltagePin, INPUT);
@@ -79,17 +76,14 @@ void setup() {
   
   // Frequency Monitor
   pinMode(monitorPin, OUTPUT);
-
-  // Number of loops between transfers to host.
-  numSkip = max(int((transferDt+100)/deltaT),1); 
-
-  first_time = false;
 }
 
 void loop() {  // Main code, runs repeatedly
   
   // Reinitializes or updates from sliders on GUI.
-  startup();
+  test.restart(config_message);
+  
+//  startup();
 
   // Make sure loop starts deltaT microsecs since last start
   unsigned int newHeadroom = max(int(deltaT) - int(loopTime), 0);
@@ -102,7 +96,6 @@ void loop() {  // Main code, runs repeatedly
   switchFlag = !switchFlag;
   digitalWrite(monitorPin, switchFlag); 
 
-  // DOESN'T GO IN HEADER FILE
   /*************** Section of Likely User modifications.**********************/
   // Read Angle, average to reduce noise.
   int angleI = 0;
@@ -119,118 +112,10 @@ void loop() {  // Main code, runs repeatedly
   float motorCmd = directV;
   float motorCmdLim = min(max(motorCmd, 0), vDrive);
   analogWrite(motorOutPWM,int((motorCmdLim/vDrive)*dacMax));
-  // DOESN'T GO IN HEADER FILE
-  
-  if (loopCounter == numSkip) {  // Lines below are for debugging.
-    packStatus(buf, angleV, motor_bemf, motorCmdLim, float(headroom));
-    Serial.write(buf,18);
-    loopCounter = 0;
-  } else loopCounter += 1;
 
-
-}
-
-// DOESN'T GO IN HEADER FILE
-void init_loop() {
-  // Initialize loop variables
-  loopCounter = 0; 
-  headroom = deltaT;
-
-  // Zero past errors
-  for (int i = past_size-1; i >= 0; i--) pastErrorV[i] = 0;
+  test.pack(angleV, motor_bemf, motorCmdLim, float(headroom));
 }
 
 
-// Initializes the loop if this is the first time, or if reconnect sent
-// from GUI.  Otherwise, just look for serial event.
-void startup(){
-  if (first_time) {
-    while(Serial.available() > 0) Serial.read(); // Clear out the serial buffer
-    Serial.println(config_message);  // Send the configuration files.
-    while (! Serial.available()) {}  // Wait for serial return.
-    while(Serial.available() > 0) Serial.read(); // Clear out the serial buffer
-    init_loop();
-    first_time = false;
-  } else {
-    serialEvent();
-  }
-}
-
-
-// Simple serial event, only looks for disconnect character, resets loop if found.
-void serialEvent() {
-  String inputString = ""; 
-  while (Serial.available()) {
-    char inChar = (char)Serial.read();
-    inputString += inChar;
-    // if the incoming character is a newline, ready to process.
-    if (inChar == '\n') {
-      processString(inputString);
-      inputString = "";
-      break;
-    }
-  }
-}
-
-// Processes the formatting string
-void processString(String inputString) {
-char St = inputString.charAt(0);
-  inputString.remove(0,1);
-  float val = inputString.toFloat();
-  switch (St) {
-    case 'P': 
-      Kp = val;
-      break;
-    case 'D':
-      Kd = val;
-      break;  
-    case 'E':
-      Kbemf = val;
-      break;
-    case 'U':
-      Ku = val;
-      break;
-    case 'I':
-      Ki = val;
-      break;  
-    case 'O':  
-      directV = val;
-      break;
-    case 'A':
-      desiredV = val;
-      break;
-    case '~':
-      first_time = true;
-      break;
-    default:
-    break;  
-  }
-}
-
-// Load the serial output buffer.
-void packStatus(char *buf, float a, float b, float c, float d) { // float e, float f, float g) {
-  
-  // Start Byte.
-  buf[0] = byte(0);
-  int n = 1; 
-  
-  memcpy(&buf[n],&a,sizeof(a));
-  n+=sizeof(a);
-  memcpy(&buf[n],&b,sizeof(b));
-  n+=sizeof(b);
-  memcpy(&buf[n],&c,sizeof(c));
-  n+=sizeof(c);
-  memcpy(&buf[n],&d,sizeof(d));
-  n+=sizeof(d);
-  /*
-  memcpy(&buf[n],&e,sizeof(e));
-  n+=sizeof(e);
-  memcpy(&buf[n],&f,sizeof(f));
-  n+=sizeof(f);
-  memcpy(&buf[n],&g,sizeof(g));
-  n+=sizeof(g);
-*/
-  // Stop byte (255 otherwise unused).
-  buf[n] = byte(255); 
-}
-
+//// Zero past errors
+//for (int i = past_size-1; i >= 0; i--) pastErrorV[i] = 0;
