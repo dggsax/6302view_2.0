@@ -33,7 +33,7 @@ float Kp, Kd, Kbemf, Ku, Ki, directV, desiredV;
 #define twopi 6.2831853  
 
 // Build library instance
-MEDIATOR mediator = MEDIATOR();
+MEDIATOR test = MEDIATOR();
 
 //Rest of Setup:
 bool first_time;
@@ -64,11 +64,6 @@ boolean switchFlag;
 
 // Initializes past values.
 void setup() {
-//  Serial.begin(115200);
-//  while (!Serial) {
-//    ; // wait for serial port to connect. Needed for native USB port only
-//  }
-// 
   // Set up inputs
   analogReadResolution(adcRes);
   pinMode(motorVoltagePin, INPUT);
