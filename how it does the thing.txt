@@ -1,0 +1,72 @@
+
+
+        #############################################
+        ##                                         ##
+        ##    How the microcode does the thing.    ##
+        ##                                         ##
+        #############################################
+
+// Starting, nothing actually loops yet.
+
+// Right here setup is just getting the system and everything set up
+// This would be where people can specify their pins on the board
+// Perhaps making the gui interface give a page for them to assign pins
+// and names to various sensors/devices/etc. would be cool.
+
+1. Setup (runs once)
+  1. Opens the Serial.
+  2. Initiates all the pins.
+  3. Sets the numskip.
+    // Numskip is pretty much the number of times the loop function will
+    // loop before it sends information to the serial buffer
+  4. Firstime = false
+2. Loop()
+  1. Startup()
+    1. If firstime = false
+      1. Clear out the serial buffer. Start fresh. #newSerialnewLife
+      2. Send the config_message to the serial buffer.
+        // So pretty much this is what builds the initial webpage of graphs,
+        // sliders, and other things, based off the created config_message
+      3. Initloop()
+        1. Set loopcounter to 0.
+        2. Set headroom to deltaT.
+        3. Set first_time to false.
+
+// All the setup is done. Things can happen now.
+1. Loop()
+  1. startup()
+    1. serialEvent()
+      1. create inputString.
+      2. it begins to read from the serial.
+	    1. reads the string from serial as characters and appends to inputString
+		  // Pretty much just bringing in the command from the 
+	    2. with a newline command '\n', it then stops reading from the serial.
+	    3. processString(inputString)
+          1. grabs the first character from the inputString as st.
+          2. deletes the first character from the inputString (st is unaffected...)
+          ########################### HELP ###########################
+          3. Turns the rest of the input string to a float.
+            // So I guess when processString runs it doesn't take an entire string
+            // at once like the config_message. It takes reported values sent to serial?
+          4. switch case with st.
+            // This is where string customization based off defined rules (located here: https://goo.gl/M0Wgzl)
+            // comes to play... This is something that will have to be polished
+            // IDEA: make the processString function automated so that from a simple
+            // web-based setup system the code can generate the header files and
+            // config_message that will be depended on but also sorta ignored to make 
+            // the user's life better.
+            1. Through letter identification, the code reassigns variables.
+  2. Does fancy math to make sure loop starts deltaT microsecs since last start.
+  3. switchFlag so that the monitor output can represent square wave
+    // Honestly, this is just there to show signs of life. Can be simple
+	// function in the header file.
+  4. USER SIDE CODE TO UTILIZE VARIABLE VALUES MODIFIED BY VALUES MODIFIED IN 1.1.1.2.3 (processString())
+  5. (if loopcount equal to numSKip) packStatus()
+	// Lol just make web interface generate all the memcpy commands to make life easier.
+	1. assign a start byte
+	2. a bunch of nasty C++ memory stuff (it's actually kinda pretty)
+	3. end byte
+  6. Send the buffer written from step 5 to the serial!!!! THIS IS HOW THE WEBPAGE GET'S FED VARIABLE INFORMATION WOOOOOOOOOOOOOOO
+  Loop around.
+
+There. That's how it does the thing.
