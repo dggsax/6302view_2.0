@@ -82,8 +82,6 @@ void loop() {  // Main code, runs repeatedly
   
   // Reinitializes or updates from sliders on GUI.
   test.restart(config_message);
-  
-//  startup();
 
   // Make sure loop starts deltaT microsecs since last start
   unsigned int newHeadroom = max(int(deltaT) - int(loopTime), 0);
